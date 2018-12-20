@@ -4,7 +4,8 @@
     <property name="build.dir" value="build"/>
     <property name="dist.dir" value="dist"/>
     <property name="lib.dir" value="lib"/>
-    <property name="doc.dir" value="lib"/>
+    <property name="doc.dir" value="doc"/>
+    <property name="reports.dir" value="reports"/>
     <property name="main.build.dir" value="${build.dir}/main"/>
     <property name="main.src.dir" value="src/main/java"/>
     <property name="test.build.dir" value="${build.dir}/test"/>
@@ -14,7 +15,8 @@
     <loadproperties srcFile="sonar-project.properties"/>
     <property name="sonar.sources" value="${main.src.dir}"/>
     <property name="sonar.java.binaries" value="${main.build.dir}"/>
-    <property name="sonar.jacoco.reportPaths" value="${build.dir}/jacoco.exec"/>
+    <property name="sonar.jacoco.reportPaths" value="${reports.dir}/jacoco.exec"/>
+    <property name="sonar.junit.reportPaths" value="${reports.dir}/junit"/>
 
     <path id="classpath.test">
       <pathelement location="lib/junit-4.9.jar"/>
@@ -41,7 +43,7 @@
     <target name="compile" depends="init">
         <echo message="Building application..."/>
         <mkdir dir="${main.build.dir}"/>
-        <javac srcdir="${main.src.dir}" destdir="${main.build.dir}" includeantruntime="false"/>
+        <javac srcdir="${main.src.dir}" destdir="${main.build.dir}" includeantruntime="false"  debug="true"/>
         <echo message="Done!"/>
     </target>
 
@@ -70,23 +72,30 @@
     <target name="test-compile" depends="compile">
         <echo message="Building tests..."/>
         <mkdir dir="${test.build.dir}"/>
-        <javac srcdir="${test.src.dir}" destdir="${test.build.dir}" includeantruntime="false">
+        <javac srcdir="${test.src.dir}" destdir="${test.build.dir}" includeantruntime="false" debug="true" >
             <classpath refid="classpath.test"/>
         </javac>
         <echo message="Done!"/>
     </target>
 
     <target name="test" depends="test-compile">
+        <mkdir dir="${reports.dir}"/>
+        <mkdir dir="${reports.dir}/junit"/>
+        <jacoco:coverage destfile="${reports.dir}/jacoco.exec">
         <junit printsummary="on" haltonfailure="yes" fork="true">
             <classpath>
                 <path refid="classpath.test"/>
                 <pathelement location="${test.build.dir}"/>
             </classpath>
-            <formatter type="brief" usefile="false"/>
-            <batchtest>
-                <fileset dir="${test.src.dir}" includes="**/*Test.java"/>
-            </batchtest>
+            <formatter type="xml"/>
+             <batchtest fork="yes" todir="${reports.dir}/junit">
+                    <fileset dir="${test.src.dir}">
+                        <include name="**/*Test*.java"/>
+                        <exclude name="**/AllTests.java"/>
+                    </fileset>
+                </batchtest>
         </junit>
+        </jacoco:coverage>
     </target>
 
     <target name="dist" depends="test"
@@ -96,7 +105,12 @@
 
         <!-- Put everything in ${build} into the MyProject-${DSTAMP}.jar file -->
         <echo message="Packaging..."/>
-        <jar jarfile="${dist.dir}/JeuDeDames-${time.stamp}.jar" basedir="${main.build.dir}"/>
+        <jar jarfile="${dist.dir}/JeuDeDames-${time.stamp}.jar" basedir="${main.build.dir}">
+        <manifest>
+            <attribute name = "Main-Class" value = "fr.ecn.dames.Main"/>
+        </manifest>
+        </jar>
+
         <echo message="Done!"/>
     </target>
 
@@ -105,13 +119,7 @@
         <javadoc sourcepath="${main.src.dir}" destdir="${doc.dir}"/>
     </target>
 
-    <target name="analyse" depends="compile">
-        <jacoco:coverage destfile="${build.dir}/jacoco.exec">
-            <junit fork="true" forkmode="once">
-                <test name="fr.ecn.dames.Main"/>
-                <classpath path="${test.build.dir}"/>
-            </junit>
-        </jacoco:coverage>
+    <target name="analyse" depends="test">
         <!-- Execute SonarQube Scanner for Ant Analysis -->
         <sonar:sonar />
     </target>
